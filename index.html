@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recomendador de libros</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Fuentes personalizadas (opcional, Tailwind usa buenas fuentes por defecto) */
+        /* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'); */
+        body {
+            /* font-family: 'Inter', sans-serif; */
+            /* Aplicar degradado de fondo suave */
+            background-image: linear-gradient(to bottom right, #fee2e2, #ffffff); /* Degradado de rojo muy claro a blanco */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-color: #ffffff; /* Color de fallback */
+        }
+
+        /* Clases personalizadas para botones */
+        .btn-primary {
+            /* Botón principal (Descargar Lista) */
+            @apply inline-block bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out w-full text-center shadow-md;
+        }
+        .btn-secondary {
+            /* Botón secundario (Volver, Imprimir, Marcar como Leído) */
+             @apply w-full bg-red-200 hover:bg-red-300 text-red-800 font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out text-center shadow-md;
+        }
+
+        /* Estilo para las tarjetas de género */
+        .genre-card {
+            /* Aplicamos estilos de tarjeta, sombreado, bordes redondeados y fondo blanco */
+            @apply bg-white rounded-lg shadow-md p-6 m-2 cursor-pointer hover:scale-105 transition duration-150 ease-in-out flex flex-col items-center text-center;
+            /* Tailwind grid handles width */
+            width: 100%;
+            cursor: pointer
+        }
+
+        /* Estilo para el emoji en las tarjetas de género */
+        .genre-emoji {
+            /* Aumentamos el tamaño del emoji y centramos */
+            font-size: 3em; /* Aproximadamente 48px */
+            @apply mb-4 flex justify-center items-center;
+        }
+
+        /* Estilo para el emoji en las tarjetas de recomendación */
+        .recommendation-emoji {
+            /* Aumentamos el tamaño del emoji */
+            font-size: 2.5em; /* Aproximadamente 40px */
+            @apply mb-2 text-center w-full;
+        }
+
+        /* Estilo para las tarjetas de recomendación */
+        .book-card {
+            @apply bg-white rounded-lg shadow-lg p-4 flex flex-col items-center text-center; /* Aseguramos centrado */
+        }
+
+        /* Estilo para la descripción del libro */
+        .book-description {
+            /* Eliminamos límites de altura y overflow */
+            display: block;
+            @apply text-gray-700 text-sm mb-4;
+            margin-bottom: 15px;
+        }
+
+
+        /* Estilo para la lista de libros leídos */
+        .read-list-item {
+             @apply bg-gray-100 rounded-md p-3 mb-2 flex justify-between items-center shadow-sm;
+        }
+
+        /* Estilo para los botones de acción en la lista de leídos */
+        .read-list-actions button {
+             /* Estilo para los botones "Descargar" y "Imprimir" */
+             @apply btn-secondary w-auto px-6; /* Usamos el estilo secundario y ajustamos ancho */
+        }
+
+
+        /* Estilo para el contenedor de tarjetas de género usando grid */
+        #genreCardsContainer {
+            display: grid;
+            /* 2 columnas en móvil por defecto */
+            grid-template-columns: 200px repeat(auto-fit, minmax(200px, 1fr)); /* Ajusta el minmax según el tamaño deseado de la tarjeta */
+            gap: 1.5rem; /* Espacio entre tarjetas */
+            justify-items: center; /* Centra las tarjetas horizontalmente */
+        }
+
+        /* 4 columnas en web (a partir de md breakpoint) */
+        @media (min-width: 768px) { /* md breakpoint en Tailwind */
+            #genreCardsContainer {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+         /* Estilo para el contenedor de recomendaciones usando grid */
+        #recommendationsList {
+            display: grid;
+            /* Siempre 3 columnas, ajustando el tamaño mínimo */
+             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Ajusta el minmax según el tamaño deseado */
+            gap: 1.5rem; /* Espacio entre tarjetas */
+            justify-items: center; /* Centra las tarjetas horizontalmente */
+        }
+
+         /* Estilo para el header en móvil/tablet */
+        @media (max-width: 767px) { /* Antes del md breakpoint */
+            header .container {
+                flex-direction: column; /* Apila los elementos en columna */
+                align-items: center; /* Centra los elementos */
+            }
+            header nav {
+                display: flex; /* Habilitar flexbox para los botones */
+                flex-direction: column; /* Apilar botones verticalmente */
+                align-items: flex-end; /* Alinear botones a la derecha */
+                margin-top: 0.5rem; /* Espacio superior para separar del título */
+            }
+             header nav button {
+                margin-left: 0 !important; /* Eliminar margen izquierdo en móvil */
+                margin-bottom: 0.5rem; /* Añadir espacio inferior entre botones */
+             }
+             header nav button:last-child {
+                 margin-bottom: 0; /* Eliminar margen inferior del último botón */
+             }
+        }
+
+
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <header class="bg-white text-gray-800 p-4 shadow-md">
+        <div class="container mx-auto max-w-screen-lg flex justify-between items-center"> <h1 class="text-2xl font-bold">Recomendador de libros</h1>
+            <nav>
+                <button id="showReadListBtn" class="text-red-600 hover:text-red-800 font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out border border-red-600 hover:border-red-800 bg-transparent">Mi Lista de Leídos</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto max-w-screen-lg p-4 flex-grow"> <section id="genreSelection" class="mb-8">
+            <h2 class="text-3xl font-semibold text-center text-gray-800 mb-6">Selecciona un género</h2>
+            <div id="genreCardsContainer">
+                </div>
+        </section>
+
+        <section id="recommendations" class="hidden mb-8">
+            <h2 id="recommendationsTitle" class="text-3xl font-semibold text-center text-gray-800 mb-6">Recomendaciones de [Género]</h2>
+            <div id="recommendationsList">
+                </div>
+            <div class="text-center mt-6">
+                 <button id="backToGenresBtn" class="btn-secondary w-auto px-6 text-red-600 hover:text-red-800 rounded-md transition duration-150 ease-in-out border border-red-600 hover:border-red-800 py-2 px-4">Volver a Géneros</button>
+            </div>
+        </section>
+
+         <section id="readListSection" class="hidden mb-8">
+            <h2 class="text-3xl font-semibold text-center text-gray-800 mb-6 ">Mis Libros Leídos</h2>
+            <div id="readListContent" class="max-w-2xl mx-auto">
+                </div> 
+             <div class="text-center mt-6 read-list-actions"> <button id="downloadReadListBtn" class="btn-primary w-auto px-6 mr-2 text-red-600 hover:text-red-800 rounded-md transition duration-150 ease-in-out border border-red-600 hover:border-red-800 py-2 px-4">Descargar Lista</button>
+                 <button id="printReadListBtn" class="btn-secondary w-auto px-6 mr-2 text-red-600 hover:text-red-800 rounded-md transition duration-150 ease-in-out border border-red-600 hover:border-red-800 py-2 px-4">Imprimir Lista</button>
+                 <button id="backFromReadListBtn" class="btn-secondary w-auto px-6 text-red-600 hover:text-red-800 rounded-md transition duration-150 ease-in-out border border-red-600 hover:border-red-800 py-2 px-4">Volver</button>
+            </div>
+        </section>
+
+         <div id="messageBox" class="fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded-md shadow-lg hidden z-50">
+            Libro añadido a tu lista de leídos.
+        </div>
+
+    </main>
+
+    <footer class="bg-gray-800 text-white text-center p-4 mt-8 shadow-inner">
+        <p>&copy; <span id="year"></span> Recomendador de libros. Creado por Franf13.</p>
+    </footer>
+
+    <script>
+        // --- DATOS ---
+        // Filtramos los géneros para eliminar los no deseados
+        const allGenres = [
+            { id: 1, name: "Ciencia Ficción", emoji: "🚀" },
+            { id: 2, name: "Fantasía", emoji: "🐉" },
+            { id: 3, name: "Misterio", emoji: "🔍" },
+            { id: 4, name: "Thriller", emoji: "🚨" },
+            { id: 5, name: "Romance", emoji: "❤️" },
+            { id: 6, name: "Histórica", emoji: "📜" },
+            { id: 7, name: "Contemporánea", emoji: "🏙️" },
+            { id: 8, name: "Biografía", emoji: "👤" },
+            { id: 12, name: "Poesía", emoji: "🖋️" },
+            { id: 13, name: "Realismo Mágico", emoji: "🦋" },
+            { id: 14, name: "Clásico", emoji: "🏛️" },
+            { id: 15, name: "Filosofía", emoji: "🤔" } 
+        ];
+
+        // Géneros permitidos después de la eliminación
+        const allowedGenres = ["Ciencia Ficción", "Fantasía", "Misterio", "Thriller", "Romance", "Histórica", "Contemporánea", "Biografía", "Poesía", "Realismo Mágico", "Clásico", "Filosofía"];
+
+        const genres = allGenres.filter(genre => allowedGenres.includes(genre.name));
+
+
+        const allBooks = 
+[
+  { id: 1, title: "Dune", author: "Frank Herbert", genre: "Ciencia Ficción", emoji: "🏜️", linkBase: "https://es.wikipedia.org/wiki/Dune", description: "Una epopeya de ciencia ficción sobre la lucha por un planeta desértico y su recurso más valioso, la especia melange." },
+  { id: 2, title: "El Señor de los Anillos", author: "J.R.R. Tolkien", genre: "Fantasía", emoji: "🧙", linkBase: "https://es.wikipedia.org/wiki/El_Se%C3%B1or_de_los_Anillos", description: "Un hobbit emprende un peligroso viaje para destruir un anillo mágico y salvar la Tierra Media de la oscuridad." },
+  { id: 3, title: "El Código Da Vinci", author: "Dan Brown", genre: "Misterio", emoji: "📖", linkBase: "https://es.wikipedia.org/wiki/El_c%C3%B3digo_Da_Vinci", description: "Un simbólogo y una criptóloga descubren una conspiración mientras investigan un asesinato en el Louvre." },
+  { id: 4, title: "La Chica del Tren", author: "Paula Hawkins", genre: "Thriller", emoji: "🚄", linkBase: "https://es.wikipedia.org/wiki/La_chica_del_tren_(novela)", description: "Una mujer con problemas de alcoholismo cree ser testigo de un crimen mientras viaja en tren, pero su memoria no es fiable." },
+  { id: 5, title: "Orgullo y Prejuicio", author: "Jane Austen", genre: "Romance", emoji: "💖", linkBase: "https://es.wikipedia.org/wiki/Orgullo_y_prejuicio", description: "La historia de Elizabeth Bennet y el Sr. Darcy, explorando temas de clase, matrimonio y moralidad en la Inglaterra georgiana." },
+  { id: 6, title: "Los Pilares de la Tierra", author: "Ken Follett", genre: "Histórica", emoji: "🏗️", linkBase: "https://es.wikipedia.org/wiki/Los_pilares_de_la_Tierra", description: "Una saga ambientada en la Inglaterra del siglo XII, centrada en la construcción de una catedral y las vidas entrelazadas de sus personajes." },
+  { id: 7, title: "Normal People", author: "Sally Rooney", genre: "Contemporánea", emoji: "👥", linkBase: "https://es.wikipedia.org/wiki/Normal_People", description: "La compleja relación entre dos jóvenes, Marianne y Connell, a lo largo de varios años, explorando la intimidad y la comunicación." },
+  { id: 8, title: "Steve Jobs", author: "Walter Isaacson", genre: "Biografía", emoji: "📱", linkBase: "https://es.wikipedia.org/wiki/Steve_Jobs_(libro)", description: "Una biografía autorizada del cofundador de Apple, basada en numerosas entrevistas con Jobs, su familia, amigos y colegas." },
+  { id: 12, title: "Veinte poemas de amor y una canción desesperada", author: "Pablo Neruda", genre: "Poesía", emoji: " ✍️", linkBase: "https://es.wikipedia.org/wiki/Veinte_poemas_de_amor_y_una_canci%C3%B3n_desesperada", description: "Una colección icónica de poemas de amor que exploran la pasión, la melancolía y la naturaleza." },
+  { id: 13, title: "Cien años de soledad", author: "Gabriel García Márquez", genre: "Realismo Mágico", emoji: "🦋", linkBase: "https://es.wikipedia.org/wiki/Cien_a%C3%B1os_de_soledad", description: "La saga de la familia Buendía en el pueblo ficticio de Macondo, una obra maestra del realismo mágico." },
+  { id: 14, title: "1984", author: "George Orwell", genre: "Ciencia Ficción", emoji: "👁️", linkBase: "https://es.wikipedia.org/wiki/1984_(novela)", description: "Una distopía sobre un futuro totalitario donde el Gran Hermano vigila todos los aspectos de la vida." },
+  { id: 15, title: "Harry Potter y la Piedra Filosofal", author: "J.K. Rowling", genre: "Fantasía", emoji: "⚡", linkBase: "https://es.wikipedia.org/wiki/Harry_Potter_y_la_piedra_filosofal", description: "La introducción al mundo mágico de Harry Potter, un niño que descubre que es un mago y asiste a Hogwarts." },
+  { id: 16, title: "El Resplandor", author: "Stephen King", genre: "Thriller", emoji: "🏨", linkBase: "https://es.wikipedia.org/wiki/El_resplandor_(novela)", description: "Una familia se muda a un hotel aislado para cuidarlo durante el invierno, pero fuerzas siniestras comienzan a afectar al padre." },
+  { id: 17, title: "Crimen y Castigo", author: "Fyodor Dostoevsky", genre: "Misterio", emoji: "🔪", linkBase: "https://es.wikipedia.org/wiki/Crimen_y_castigo", description: "Un estudiante pobre comete un asesinato y lucha con su culpa y las consecuencias psicológicas de sus actos." },
+  { id: 18, title: "Antes de ti", author: "Jojo Moyes", genre: "Romance", emoji: "♿", linkBase: "https://es.wikipedia.org/wiki/Antes_de_ti", description: "La historia de una joven que se convierte en cuidadora de un hombre rico que quedó tetrapléjico tras un accidente." },
+  { id: 19, title: "La Sombra del Viento", author: "Carlos Ruiz Zafón", genre: "Misterio", emoji: "👻", linkBase: "https://es.wikipedia.org/wiki/La_sombra_del_viento", description: "Un joven descubre un libro misterioso en el Cementerio de los Libros Olvidados y se ve envuelto en una intriga oscura." },
+  { id: 20, title: "Sapiens: De animales a dioses", author: "Yuval Noah Harari", genre: "Histórica", emoji: "🐒", linkBase: "https://es.wikipedia.org/wiki/Sapiens:_De_animales_a_dioses", description: "Una breve historia de la humanidad, explorando cómo Homo sapiens llegó a dominar el planeta." },
+  { id: 21, title: "El Principito", author: "Antoine de Saint-Exupéry", genre: "Fantasía", emoji: " 🦊", linkBase: "https://es.wikipedia.org/wiki/El_principito", description: "Un piloto estrellado en el desierto conoce a un pequeño príncipe de otro planeta, aprendiendo lecciones sobre la vida y el amor." },
+  { id: 22, title: "Fundación", author: "Isaac Asimov", genre: "Ciencia Ficción", emoji: "🌌", linkBase: "https://es.wikipedia.org/wiki/Fundaci%C3%B3n_(novela)", description: "Un científico predice la caída del Imperio Galáctico y crea una fundación para preservar el conocimiento y acortar la era oscura." },
+  { id: 23, title: "Don Quijote de la Mancha", author: "Miguel de Cervantes", genre: "Clásico", emoji: "🐎", linkBase: "https://es.wikipedia.org/wiki/Don_Quijote_de_la_Mancha", description: "Las aventuras de un hidalgo que enloquece leyendo libros de caballerías y decide convertirse en caballero andante." },
+  { id: 26, title: "Meditaciones", author: "Marco Aurelio", genre: "Filosofía", emoji: "🤔", linkBase: "https://es.wikipedia.org/wiki/Meditaciones", description: "Una serie de reflexiones personales del emperador romano Marco Aurelio sobre la filosofía estoica." },
+  { id: 27, title: "El arte de la guerra", author: "Sun Tzu", genre: "Histórica", emoji: "⚔️", linkBase: "https://es.wikipedia.org/wiki/El_arte_de_la_guerra", description: "Un antiguo tratado militar chino que ofrece estrategias y tácticas para la guerra y la gestión de conflictos." },
+  { id: 28, title: "El retrato de Dorian Gray", author: "Oscar Wilde", genre: "Clásico", emoji: "🖼️", linkBase: "https://es.wikipedia.org/wiki/El_retrato_de_Dorian_Gray", description: "Un joven vende su alma para que un retrato envejezca en su lugar, mientras él conserva su juventud y belleza." },
+  { id: 29, title: "Fahrenheit 451", author: "Ray Bradbury", genre: "Ciencia Ficción", emoji: "🔥", linkBase: "https://es.wikipedia.org/wiki/Fahrenheit_451", description: "En un futuro distópico, los bomberos queman libros en lugar de apagar incendios, y un bombero cuestiona su papel." },
+  { id: 30, title: "La Odisea", author: "Homero", genre: "Clásico", emoji: "🚢", linkBase: "https://es.wikipedia.org/wiki/Odisea", description: "El épico viaje de Odiseo de regreso a casa después de la Guerra de Troya, enfrentando monstruos y desafíos." },
+  { id: 31, title: "Un Mundo Feliz", author: "Aldous Huxley", genre: "Ciencia Ficción", emoji: "💊", linkBase: "https://es.wikipedia.org/wiki/Un_mundo_feliz", description: "Una sociedad futurista controlada por la tecnología, la ingeniería genética y la manipulación psicológica." },
+  { id: 32, title: "El Nombre del Viento", author: "Patrick Rothfuss", genre: "Fantasía", emoji: "🌬️", linkBase: "https://es.wikipedia.org/wiki/El_nombre_del_viento", description: "La historia de Kvothe, un legendario músico, asesino y mago, contada por él mismo." },
+  { id: 33, title: "La Verdad Sobre el Caso Harry Quebert", author: "Joël Dicker", genre: "Misterio", emoji: "✍️", linkBase: "https://es.wikipedia.org/wiki/La_verdad_sobre_el_caso_Harry_Quebert", description: "Un joven escritor investiga el asesinato de una chica desaparecida años atrás, en el que su mentor es el principal sospechoso." },
+  { id: 34, title: "Perdida", author: "Gillian Flynn", genre: "Thriller", emoji: " ♀️", linkBase: "https://es.wikipedia.org/wiki/Perdida_(novela)", description: "La desaparición de una mujer en su quinto aniversario de bodas y el escrutinio mediático sobre su marido." },
+  { id: 35, title: "El Diario de Bridget Jones", author: "Helen Fielding", genre: "Romance", emoji: "✍️", linkBase: "https://es.wikipedia.org/wiki/El_diario_de_Bridget_Jones", description: "Las divertidas y a menudo desastrosas entradas del diario de una treintañera soltera en Londres." },
+  { id: 36, title: "La Ladrona de Libros", author: "Markus Zusak", genre: "Histórica", emoji: "📚", linkBase: "https://es.wikipedia.org/wiki/La_ladrona_de_libros", description: "La historia de una niña en la Alemania nazi que encuentra consuelo robando libros, narrada por la Muerte." },
+  { id: 37, title: "Eleanor Oliphant Está Perfectamente", author: "Gail Honeyman", genre: "Contemporánea", emoji: "🌵", linkBase: "https://es.wikipedia.org/wiki/Eleanor_Oliphant_Is_Completely_Fine", description: "La vida solitaria y peculiar de Eleanor Oliphant cambia inesperadamente tras un encuentro fortuito." },
+  { id: 38, title: "Open: An Autobiography", author: "Andre Agassi", genre: "Biografía", emoji: "🎾", linkBase: "https://es.wikipedia.org/wiki/Open_(libro)", description: "La sincera y reveladora autobiografía del legendario tenista Andre Agassi." },
+  { id: 39, title: "Poeta en Nueva York", author: "Federico García Lorca", genre: "Poesía", emoji: "🗽", linkBase: "https://es.wikipedia.org/wiki/Poeta_en_Nueva_York", description: "Una colección de poemas escritos por Lorca durante su estancia en Nueva York, marcada por la angustia y la crítica social." },
+  { id: 40, title: "Pedro Páramo", author: "Juan Rulfo", genre: "Realismo Mágico", emoji: "💀", linkBase: "https://es.wikipedia.org/wiki/Pedro_P%C3%A1ramo", description: "Un hombre busca a su padre en un pueblo fantasma habitado por las voces de los muertos." },
+  { id: 41, title: "La República", author: "Platón", genre: "Filosofía", emoji: "🏛️", linkBase: "https://es.wikipedia.org/wiki/La_Rep%C3%BAblica_(Plat%C3%B3n)", description: "Un diálogo socrático que explora la justicia, el orden de la ciudad-estado ideal y el alma justa." },
+  { id: 42, title: "Hamlet", author: "William Shakespeare", genre: "Clásico", emoji: "👑", linkBase: "https://es.wikipedia.org/wiki/Hamlet", description: "La tragedia del Príncipe Hamlet de Dinamarca, quien busca vengar el asesinato de su padre." },
+  { id: 43, title: "Flores para Algernon", author: "Daniel Keyes", genre: "Ciencia Ficción", emoji: "🧠", linkBase: "https://es.wikipedia.org/wiki/Flores_para_Algernon", description: "Un hombre con discapacidad intelectual se somete a un experimento para aumentar su inteligencia, con resultados inesperados." },
+  { id: 44, title: "El Hobbit", author: "J.R.R. Tolkien", genre: "Fantasía", emoji: " 🏞️", linkBase: "https://es.wikipedia.org/wiki/El_Hobbit", description: "La aventura de Bilbo Bolsón, un hobbit que se une a un grupo de enanos para recuperar un tesoro custodiado por un dragón." },
+  { id: 45, title: "El Sabueso de los Baskerville", author: "Arthur Conan Doyle", genre: "Misterio", emoji: " 🐕", linkBase: "https://es.wikipedia.org/wiki/El_sabueso_de_los_Baskerville", description: "Sherlock Holmes investiga una supuesta maldición familiar y un sabueso fantasmal en los páramos de Dartmoor." },
+  { id: 46, title: "El Silencio de los Corderos", author: "Thomas Harris", genre: "Thriller", emoji: " 🐑", linkBase: "https://es.wikipedia.org/wiki/El_silencio_de_los_corderos_(novela)", description: "Una joven agente del FBI busca la ayuda de un brillante y peligroso caníbal para atrapar a un asesino en serie." },
+  { id: 47, title: "Cumbres Borrascosas", author: "Emily Brontë", genre: "Romance", emoji: " 💔", linkBase: "https://es.wikipedia.org/wiki/Cumbres_Borrascosas", description: "Una intensa y oscura historia de amor y venganza en los páramos de Yorkshire." },
+  { id: 48, title: "Soldados de Salamina", author: "Javier Cercas", genre: "Histórica", emoji: " 🕊️", linkBase: "https://es.wikipedia.org/wiki/Soldados_de_Salamina", description: "Un periodista investiga la historia de un escritor falangista que fue perdonado durante la Guerra Civil Española." },
+  { id: 49, title: "Patria", author: "Fernando Aramburu", genre: "Contemporánea", emoji: " 🏘️", linkBase: "https://es.wikipedia.org/wiki/Patria_(novela)", description: "Las vidas de dos familias vascas afectadas por la violencia de ETA a lo largo de varias décadas." },
+  { id: 50, title: "Frida Kahlo: Una Biografía", author: "Hayden Herrera", genre: "Biografía", emoji: " 🌺", linkBase: "https://www.penguinlibros.com/es/biografias/12338-frida-kahlo-9788437607018", description: "Una biografía detallada y conmovedora de la icónica pintora mexicana Frida Kahlo." },
+  { id: 51, title: "Las Flores del Mal", author: "Charles Baudelaire", genre: "Poesía", emoji: " 🥀", linkBase: "https://es.wikipedia.org/wiki/Las_flores_del_mal", description: "Una obra cumbre de la poesía simbolista, explorando la belleza en lo decadente y lo prohibido." },
+  { id: 52, title: "El Amor en los Tiempos del Cólera", author: "Gabriel García Márquez", genre: "Realismo Mágico", emoji: " 💘", linkBase: "https://es.wikipedia.org/wiki/El_amor_en_los_tiempos_del_c%C3%B3lera", description: "Una historia épica de un amor que perdura por más de cincuenta años, a través de separaciones y enfermedades." },
+  { id: 53, title: "Así Habló Zaratustra", author: "Friedrich Nietzsche", genre: "Filosofía", emoji: " ⛰️", linkBase: "https://es.wikipedia.org/wiki/As%C3%AD_habl%C3%B3_Zaratustra", description: "Una obra filosófica y poética que presenta las ideas de Nietzsche a través del personaje de Zaratustra." },
+  { id: 54, title: "Orgullo y Prejuicio", author: "Jane Austen", genre: "Clásico", emoji: " 👑", linkBase: "https://es.wikipedia.org/wiki/Orgullo_y_prejuicio", description: "La historia de Elizabeth Bennet y el Sr. Darcy, explorando temas de clase, matrimonio y moralidad en la Inglaterra georgiana." },
+  { id: 55, title: "Neuromante", author: "William Gibson", genre: "Ciencia Ficción", emoji: " 💻", linkBase: "https://es.wikipedia.org/wiki/Neuromante", description: "Considerada una obra fundacional del cyberpunk, sigue a un hacker contratado para una última misión." },
+  { id: 56, title: "El Nombre del Viento", author: "Patrick Rothfuss", genre: "Fantasía", emoji: " 🎶", linkBase: "https://es.wikipedia.org/wiki/El_nombre_del_viento", description: "La historia de Kvothe, un legendario músico, asesino y mago, contada por él mismo." },
+  { id: 57, title: "La Caza del Octubre Rojo", author: "Tom Clancy", genre: "Thriller", emoji: "⚓", linkBase: "https://es.wikipedia.org/wiki/La_caza_del_Octubre_Rojo_(novela)", description: "Un submarino nuclear soviético de última generación se dirige hacia la costa de EE.UU., y un analista de la CIA debe determinar si es una deserción o un ataque." },
+  { id: 58, title: "El Gran Gatsby", author: "F. Scott Fitzgerald", genre: "Clásico", emoji: " 🥂", linkBase: "https://es.wikipedia.org/wiki/El_gran_Gatsby", description: "La historia de Jay Gatsby, un misterioso millonario, y su obsesión por recuperar un amor del pasado en la década de 1920." },
+  { id: 59, title: "Ficciones", author: "Jorge Luis Borges", genre: "Realismo Mágico", emoji: "📚", linkBase: "https://es.wikipedia.org/wiki/Ficciones", description: "Una colección de cuentos que exploran temas filosóficos y metafísicos a través de laberintos, bibliotecas infinitas y realidades alternativas." },
+  { id: 60, title: "Más allá del bien y del mal", author: "Friedrich Nietzsche", genre: "Filosofía", emoji: " 🤔", linkBase: "https://es.wikipedia.org/wiki/M%C3%A1s_all%C3%A1_del_bien_y_del_mal", description: "Una crítica a la moral tradicional y una exploración de nuevas perspectivas filosóficas." },
+  { id: 61, title: "El León, la Bruja y el Armario", author: "C.S. Lewis", genre: "Fantasía", emoji: " 🦁", linkBase: "https://es.wikipedia.org/wiki/El_le%C3%B3n,_la_bruja_y_el_armario", description: "Cuatro hermanos descubren un mundo mágico a través de un armario, donde deben ayudar a derrotar a una bruja malvada." },
+  { id: 62, title: "El Imperio Final (Nacidos de la Bruma #1)", author: "Brandon Sanderson", genre: "Fantasía", emoji: " 🌫️", linkBase: "https://es.wikipedia.org/wiki/El_imperio_final", description: "En un mundo cubierto por ceniza, un grupo de rebeldes planea derrocar al tiránico Lord Legislador, poseedor de poderes divinos." },
+  { id: 63, title: "Asesinato en el Orient Express", author: "Agatha Christie", genre: "Misterio", emoji: " 🚂", linkBase: "https://es.wikipedia.org/wiki/Asesinato_en_el_Orient_Express", description: "Hércules Poirot debe resolver el asesinato de un pasajero a bordo del famoso tren Orient Express, varado por la nieve." },
+  { id: 64, title: "El Nombre de la Rosa", author: "Umberto Eco", genre: "Misterio", emoji: " 📖", linkBase: "https://es.wikipedia.org/wiki/El_nombre_de_la_rosa", description: "Un monje franciscano y su novicio investigan una serie de misteriosas muertes en una abadía benedictina en el siglo XIV." },
+  { id: 65, title: "El Psicoanalista", author: "John Katzenbach", genre: "Thriller", emoji: " 🤔", linkBase: "https://es.wikipedia.org/wiki/El_psicoanalista", description: "Un psicoanalista recibe una carta anónima que lo obliga a descubrir la identidad de alguien que busca destruir su vida, o uno de sus seres queridos morirá." },
+  { id: 66, title: "El Cuaderno de Noah", author: "Nicholas Sparks", genre: "Romance", emoji: " 💌", linkBase: "https://es.wikipedia.org/wiki/The_Notebook_(novela)", description: "La conmovedora historia de un amor de verano que perdura a través de los años, narrada desde un hogar de ancianos." },
+  { id: 67, title: "Bajo la Misma Estrella", author: "John Green", genre: "Romance", emoji: " ✨", linkBase: "https://es.wikipedia.org/wiki/The_Fault_in_Our_Stars", description: "La historia de amor entre dos adolescentes, Hazel y Gus, que se conocen en un grupo de apoyo para pacientes con cáncer." },
+  { id: 68, title: "El Médico", author: "Noah Gordon", genre: "Histórica", emoji: " 🩺", linkBase: "https://es.wikipedia.org/wiki/El_m%C3%A9dico_(novela)", description: "La vida de Rob J. Cole, un huérfano inglés que viaja a Persia en el siglo XI para estudiar medicina con un legendario maestro." },
+  { id: 69, title: "El Jilguero", author: "Donna Tartt", genre: "Contemporánea", emoji: " 🎨", linkBase: "https://es.wikipedia.org/wiki/El_jilguero_(novela)", description: "La vida de Theo Decker después de que un atentado en un museo de Nueva York cambie su vida para siempre, involucrándolo en el mundo del arte y el crimen." },
+  { id: 70, title: "Pequeños Fuegos por Todas Partes", author: "Celeste Ng", genre: "Contemporánea", emoji: " 🔥", linkBase: "https://es.wikipedia.org/wiki/Little_Fires_Everywhere_(novela)", description: "Las vidas de dos familias en Shaker Heights, un suburbio aparentemente perfecto, se entrelazan con consecuencias inesperadas." },
+  { id: 71, title: "Leonardo da Vinci", author: "Walter Isaacson", genre: "Biografía", emoji: " 🖌️", linkBase: "https://es.wikipedia.org/wiki/Leonardo_da_Vinci_(libro_de_Walter_Isaacson)", description: "Una biografía del genio renacentista, basada en miles de páginas de sus cuadernos, que revela la conexión entre su arte y su ciencia." },
+  { id: 72, title: "Campos de Castilla", author: "Antonio Machado", genre: "Poesía", emoji: " 🌾", linkBase: "https://es.wikipedia.org/wiki/Campos_de_Castilla", description: "Una colección de poemas que retratan el paisaje castellano y reflexionan sobre España, el tiempo y la existencia." },
+  { id: 73, title: "Como Agua para Chocolate", author: "Laura Esquivel", genre: "Realismo Mágico", emoji: " 🌶️", linkBase: "https://es.wikipedia.org/wiki/Como_agua_para_chocolate", description: "La historia de Tita, cuyas emociones se manifiestan en su cocina, afectando a quienes prueban sus platillos, en el México posrevolucionario." },
+  { id: 74, title: "Moby Dick", author: "Herman Melville", genre: "Clásico", emoji: " 🐳", linkBase: "https://es.wikipedia.org/wiki/Moby_Dick", description: "La obsesiva búsqueda del Capitán Ahab por la ballena blanca Moby Dick, una épica reflexión sobre la venganza, la naturaleza y la locura." },
+  { id: 75, title: "El Príncipe", author: "Nicolás Maquiavelo", genre: "Filosofía", emoji: " 👑", linkBase: "https://es.wikipedia.org/wiki/El_pr%C3%ADncipe", description: "Un tratado político del siglo XVI que describe los métodos por los cuales un príncipe puede adquirir y mantener el poder político." }
+]
+
+        // Filtramos los libros para que solo incluyan los de los géneros permitidos
+        const books = allBooks.filter(book => allowedGenres.includes(book.genre));
+
+
+        let readBooks = []; // Array para almacenar los IDs de los libros leídos
+        let currentGenreBooks = []; // Libros del género actualmente mostrado
+        let displayedBookIds = new Set(); // IDs de los libros actualmente mostrados en recomendaciones
+
+
+        // --- ELEMENTOS DEL DOM ---
+        const genreSelectionSection = document.getElementById('genreSelection');
+        const genreCardsContainer = document.getElementById('genreCardsContainer'); // Contenedor para las tarjetas
+        const recommendationsSection = document.getElementById('recommendations');
+        const recommendationsTitle = document.getElementById('recommendationsTitle');
+        const recommendationsList = document.getElementById('recommendationsList');
+        const readListSection = document.getElementById('readListSection');
+        const readListContent = document.getElementById('readListContent');
+        // const showGenreSelectionBtn = document.getElementById('showGenreSelectionBtn'); // Eliminado del HTML
+        const showReadListBtn = document.getElementById('showReadListBtn');
+        const backToGenresBtn = document.getElementById('backToGenresBtn');
+        const backFromReadListBtn = document.getElementById('backFromReadListBtn');
+        const downloadReadListBtn = document.getElementById('downloadReadListBtn');
+        const printReadListBtn = document.getElementById('printReadListBtn'); // Botón de imprimir
+        const yearSpan = document.getElementById('year');
+        const messageBox = document.getElementById('messageBox');
+
+
+        // --- FUNCIONES DE NAVEGACIÓN ---
+        function showGenreSelection() {
+            genreSelectionSection.classList.remove('hidden');
+            recommendationsSection.classList.add('hidden');
+            readListSection.classList.add('hidden');
+             // Limpiar recomendaciones y IDs mostrados al volver a géneros
+            recommendationsList.innerHTML = '';
+            displayedBookIds.clear();
+        }
+
+        function showRecommendations(genreName) {
+            genreSelectionSection.classList.add('hidden');
+            recommendationsSection.classList.remove('hidden');
+            readListSection.classList.add('hidden');
+            recommendationsTitle.textContent = `Recomendaciones de ${genreName}`;
+            displayRecommendations(genreName);
+        }
+
+         function showReadList() {
+            genreSelectionSection.classList.add('hidden');
+            recommendationsSection.classList.add('hidden');
+            readListSection.classList.remove('hidden');
+            renderReadList(); // Renderiza la lista cada vez que se muestra
+        }
+
+
+        // --- FUNCIONES DE DATOS Y RENDERIZADO ---
+
+        // Función para encontrar un libro por su ID
+        function findBookById(id) {
+            return books.find(book => book.id === id) || null;
+        }
+
+        // Guarda la lista de leídos en localStorage
+        function saveReadList() {
+            localStorage.setItem('readBooks', JSON.stringify(readBooks));
+        }
+
+        // Carga la lista de leídos de localStorage
+        function loadReadList() {
+            const storedList = localStorage.getItem('readBooks');
+            if (storedList) {
+                readBooks = JSON.parse(storedList);
+            }
+        }
+
+        // Muestra un mensaje temporal
+        function showMessage(message, isError = false) {
+            messageBox.textContent = message;
+            if (isError) {
+                messageBox.classList.remove('bg-green-500');
+                messageBox.classList.add('bg-red-500');
+            } else {
+                 messageBox.classList.remove('bg-red-500');
+                messageBox.classList.add('bg-green-500');
+            }
+            messageBox.classList.remove('hidden');
+            // Ocultar después de 3 segundos
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Crea las tarjetas de género
+        function createGenreButtons() {
+            genreCardsContainer.innerHTML = ''; // Limpiar contenedor antes de añadir
+            genres.forEach(genre => {
+                // Crear el elemento div que actuará como tarjeta
+                const card = document.createElement('div');
+                card.classList.add('genre-card', 'shadow-md', 'rounded-lg', 'bg-white', 'items-center', 'text-center', 'bg-white', 'p-4', 'items-center'); // Aplicar clases de estilo de tarjeta
+                card.dataset.genre = genre.name; // Guardar el nombre del género en un atributo de datos
+
+                // Contenido de la tarjeta
+                card.innerHTML = `
+                    <div class="genre-emoji">${genre.emoji}</div>
+                    <h3 class="text-xl font-semibold text-gray-700">${genre.name}</h3>
+                `;
+
+                // Añadir evento click a la tarjeta
+                card.addEventListener('click', () => {
+                    showRecommendations(genre.name);
+                });
+
+                // Añadir la tarjeta al contenedor
+                genreCardsContainer.appendChild(card);
+            });
+        }
+
+        // Obtiene N recomendaciones aleatorias no leídas para un género
+        function getRandomRecommendations(genreName, count) {
+            const availableBooks = books.filter(book =>
+                book.genre === genreName &&
+                !readBooks.includes(book.id) && // No leídos
+                !displayedBookIds.has(book.id) // No mostrados actualmente
+            );
+
+            // Mezclar los libros disponibles
+            for (let i = availableBooks.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableBooks[i], availableBooks[j]] = [availableBooks[j], availableBooks[i]]; // Intercambio
+            }
+
+            // Devolver los primeros 'count' libros (o menos si no hay suficientes)
+            return availableBooks.slice(0, count);
+        }
+
+
+        // Muestra las recomendaciones para un género
+        function displayRecommendations(genreName) {
+            recommendationsList.innerHTML = ''; // Limpiar lista antes de añadir
+            displayedBookIds.clear(); // Limpiar IDs mostrados al cambiar de género
+
+            // Obtener todos los libros de este género (para referencia)
+            currentGenreBooks = books.filter(book => book.genre === genreName);
+
+            // Obtener las 3 recomendaciones iniciales
+            const initialRecommendations = getRandomRecommendations(genreName, 3);
+
+            if (initialRecommendations.length === 0) {
+                recommendationsList.innerHTML = '<p class="text-center text-gray-600 col-span-full">No hay recomendaciones disponibles para este género.</p>';
+                return;
+            }
+
+            initialRecommendations.forEach(book => {
+                addBookToRecommendationsList(book);
+            });
+        }
+
+        // Añade un libro a la lista de recomendaciones mostrada
+        function addBookToRecommendationsList(book) {
+             const bookElement = document.createElement('div');
+                // Aplicar clases de estilo de tarjeta de libro
+                bookElement.classList.add('book-card', 'shadow-md', 'rounded-lg', 'p-4', 'bg-white', 'flex', 'flex-col', 'items-center', 'text-center'); // Aseguramos centrado
+                bookElement.dataset.bookId = book.id; // Añadir data-book-id para fácil referencia
+
+                // Usar la descripción completa ya que se eliminó el límite de caracteres en CSS
+                const description = book.description || 'Sin descripción disponible.';
+
+
+                bookElement.innerHTML = `
+                    <div class="recommendation-emoji">${book.emoji}</div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-1">${book.title}</h3>
+                    <p class="text-gray-600 text-sm mb-2">por ${book.author}</p>
+                    <p class="book-description">${description}</p> <a href="${book.linkBase}" target="_blank" class="text-red-600 hover:underline text-sm mb-4">Más Información</a>
+                    <button class="btn-secondary text-red-600 hover:text-red-800 rounded-md transition duration-150 ease-in-out border border-red-600 hover:border-red-800 py-1 px-2" data-book-id="${book.id}">Marcar como leído</button> `;
+
+                // Añadir evento click al botón "Marcar como Leído"
+                const markAsReadBtn = bookElement.querySelector('button');
+                markAsReadBtn.addEventListener('click', handleMarkAsRead); // Usar una función separada
+
+                recommendationsList.appendChild(bookElement);
+                displayedBookIds.add(book.id); // Añadir a los IDs mostrados
+        }
+
+        // Maneja el evento de marcar como leído
+        function handleMarkAsRead(event) {
+            const bookId = parseInt(event.target.dataset.bookId);
+            const bookElement = event.target.closest('.book-card'); // Encontrar el elemento de la tarjeta
+
+            if (!readBooks.includes(bookId)) {
+                readBooks.push(bookId);
+                saveReadList();
+                const book = findBookById(bookId);
+                if (book) {
+                     showMessage(`"${book.title}" añadido a tu lista de leídos.`);
+                }
+
+
+                // 1. Eliminar el libro de la vista de recomendaciones
+                if (bookElement) {
+                    bookElement.remove();
+                    displayedBookIds.delete(bookId); // Eliminar de los IDs mostrados
+                }
+
+                // 2. Añadir una nueva recomendación aleatoria (si hay disponibles)
+                const currentGenreName = recommendationsTitle.textContent.replace('Recomendaciones de ', '');
+                const newRecommendations = getRandomRecommendations(currentGenreName, 1); // Obtener 1 nueva recomendación
+
+                if (newRecommendations.length > 0) {
+                    addBookToRecommendationsList(newRecommendations[0]); // Añadir la nueva recomendación
+                } else {
+                    // Si no hay más recomendaciones disponibles para este género
+                    if (recommendationsList.children.length === 0) {
+                         recommendationsList.innerHTML = '<p class="text-center text-gray-600 col-span-full">No hay más recomendaciones disponibles para este género.</p>';
+                    } else {
+                         // Opcional: Mostrar un mensaje si no se puede reemplazar
+                         // showMessage("No hay más libros sin leer en este género para añadir.", true);
+                    }
+                }
+
+                 renderReadList(); // Actualizar la lista de leídos mostrada si está visible
+            }
+        }
+
+
+        // Renderiza la lista de libros leídos
+        function renderReadList() {
+            readListContent.innerHTML = ''; // Limpiar lista antes de añadir
+
+            if (readBooks.length === 0) {
+                readListContent.innerHTML = '<p class="text-center text-gray-600">Tu lista de libros leídos está vacía.</p>';
+                return;
+            }
+
+            // Obtener detalles de los libros leídos y ordenarlos alfabéticamente
+            const readBooksDetails = readBooks.map(id => findBookById(id)).filter(book => book !== null);
+            readBooksDetails.sort((a,b) => a.title.localeCompare(b.title));
+
+
+            readBooksDetails.forEach(book => {
+                const listItem = document.createElement('div');
+                listItem.classList.add('read-list-item');
+                listItem.innerHTML = `
+                    <span>${book.title} por ${book.author}</span>
+                    <button class="text-red-600 hover:text-red-800 text-sm font-semibold" data-book-id="${book.id}">Eliminar</button>
+                `;
+
+                // Añadir evento click al botón "Eliminar"
+                const deleteBtn = listItem.querySelector('button');
+                deleteBtn.addEventListener('click', () => {
+                    readBooks = readBooks.filter(id => id !== book.id);
+                    saveReadList();
+                    showMessage(`"${book.title}" eliminado de tu lista de leídos.`);
+                    renderReadList(); // Volver a renderizar la lista después de eliminar
+                    // Opcional: Si estás en la vista de recomendaciones, actualizar el botón correspondiente
+                    const recBtn = recommendationsList.querySelector(`button[data-book-id="${book.id}"]`);
+                    if(recBtn) {
+                        recBtn.textContent = 'Marcar como leído';
+                        recBtn.classList.remove('btn-secondary');
+                        recBtn.classList.add('btn-primary');
+                        recBtn.disabled = false;
+                    }
+                });
+
+                readListContent.appendChild(listItem);
+            });
+        }
+
+        // Función para descargar la lista de leídos como JSON
+        function downloadReadList() {
+             if (readBooks.length === 0) {
+                showMessage("Tu lista de libros leídos está vacía.", true); // Mensaje de error
+                return;
+            }
+            const readBooksDetails = readBooks.map(id => findBookById(id)).filter(book => book !== null);
+            // Ordenar alfabéticamente para la descarga
+            readBooksDetails.sort((a,b) => a.title.localeCompare(b.title));
+
+            // Excluir 'linkBase' si no quieres descargarlo
+             const dataToDownload = readBooksDetails.map(({ linkBase, ...rest }) => rest);
+
+            const dataStr = JSON.stringify(dataToDownload, null, 2); // Pretty print JSON
+            const dataBlob = new Blob([dataStr], { type: 'application/json;charset=utf-8' }); // Especificar charset
+            const url = URL.createObjectURL(dataBlob);
+
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.href = url;
+            downloadAnchorNode.download = "mis_libros_leidos.json"; // Nombre archivo
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            URL.revokeObjectURL(url); // Limpiar el objeto URL
+             showMessage("Lista descargada correctamente.");
+        }
+
+        // Función para imprimir la lista de leídos
+        function printReadList() {
+             if (readBooks.length === 0) {
+                showMessage("Tu lista de libros leídos está vacía.", true); // Mensaje de error
+                return;
+            }
+            // Abre la ventana de impresión del navegador
+            window.print();
+        }
+
+
+        // --- EVENT LISTENERS ---
+        // showGenreSelectionBtn.addEventListener('click', showGenreSelection); // Eliminado del HTML y JS
+        showReadListBtn.addEventListener('click', showReadList);
+        backToGenresBtn.addEventListener('click', showGenreSelection);
+        backFromReadListBtn.addEventListener('click', showGenreSelection); // Volver a géneros desde la lista de leídos
+        downloadReadListBtn.addEventListener('click', downloadReadList);
+        printReadListBtn.addEventListener('click', printReadList); // Event listener para imprimir
+
+
+        // --- INICIALIZACIÓN ---
+        document.addEventListener('DOMContentLoaded', () => {
+            yearSpan.textContent = new Date().getFullYear(); // Poner año actual en footer
+            loadReadList(); // Cargar lista de leídos al inicio
+            createGenreButtons(); // Crear las tarjetas de género al cargar
+            renderReadList(); // Renderizar la lista de leídos al cargar (aunque esté oculta)
+            showGenreSelection(); // Mostrar la sección de selección de género por defecto
+        });
+
+    </script>
+
+</body>
+</html>
