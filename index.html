@@ -183,7 +183,6 @@
 
         .btn-solid-red:hover {background: var(--secondary-color);}
 
-
         .mas-informacion, .btn-secundario {
             display: inline-block;
             text-decoration: none;
@@ -206,7 +205,7 @@
             margin-top: 1.5rem;
         }
         
-        .actions-container button {margin: 0 0.25rem;}
+        .actions-container button {margin: 0 0.25rem 0.5rem 0;}
 
         #readListContent {
             max-width: 42rem;
@@ -263,12 +262,12 @@
                 align-items: center;
             }
 
+            header nav {margin-top: 0.5rem;}
+
             header h1 {font-size: 1.2rem;}
 
             .section-title {font-size: 1.2rem;}
-        
-            header nav {margin-top: 0.5rem;}
-
+            
             .book-card, .genre-card {flex: 1 1 100%;}
 
             .container {margin: 30px auto;}
@@ -529,6 +528,7 @@
             genreSelectionSection.classList.remove('hidden');
             recommendationsSection.classList.add('hidden');
             readListSection.classList.add('hidden');
+            window.scrollTo(0, 0);
         }
 
         function showRecommendations(genreName) {
@@ -537,15 +537,16 @@
             readListSection.classList.add('hidden');
             recommendationsTitle.textContent = `Recomendaciones de ${genreName}`;
             displayRecommendations(genreName);
+            window.scrollTo(0, 0);
         }
 
-         function showReadList() {
+        function showReadList() {
             genreSelectionSection.classList.add('hidden');
             recommendationsSection.classList.add('hidden');
             readListSection.classList.remove('hidden');
             renderReadList();
+            window.scrollTo(0, 0);
         }
-
         function findBookById(id) {
             return books.find(book => book.id === id) || null;
         }
@@ -712,8 +713,3 @@
 
 </body>
 </html>
-
-
-
-
-
